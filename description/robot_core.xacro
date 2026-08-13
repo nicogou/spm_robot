@@ -1,0 +1,134 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+	<!-- White -->
+	<material name="white">
+		<color rgba="1 1 1 1"/>
+	</material>
+
+	<!-- Black -->
+	<material name="black">
+		<color rgba="0 0 0 1"/>
+	</material>
+
+
+	<!-- BASE_LINK -->
+
+	<link name="base_link">
+		<visual>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_Base.stl"/>
+			</geometry>
+			<material name="white"/>
+		</visual>
+	</link>
+
+	<!-- FIRST_ARM -->
+
+	<joint name="first_arm_joint" type="continuous">
+		<parent link="base_link"/>
+		<child link="first_arm"/>
+		<origin xyz="0 0 0.003" rpy="0 0 0"/>
+		<axis xyz="0 0 1"/>
+	</joint>
+
+	<link name="first_arm">
+		<visual>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_arm_1.stl"/>
+			</geometry>
+			<material name="white"/>
+		</visual>
+	</link>
+
+	<joint name="first_arm_upper_joint" type="continuous">
+		<parent link="first_arm"/>
+		<child link="first_arm_upper"/>
+		<origin xyz="0.0433013 0 0.05150" rpy="0 -1.0472 0"/>
+		<axis xyz="0 0 1"/>
+	</joint>
+
+	<link name="first_arm_upper">
+		<visual>
+			<origin rpy="0 0 3.141592"/>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_upper_arm.stl"/>
+			</geometry>
+			<material name="white"/>
+		</visual>
+	</link>
+
+
+	<!-- SECOND_ARM -->
+
+	<joint name="second_arm_joint" type="continuous">
+		<parent link="base_link"/>
+		<child link="second_arm"/>
+		<origin xyz="0 0 0.011" rpy="0 0 2.0944"/>
+		<axis xyz="0 0 1"/>
+	</joint>
+
+	<link name="second_arm">
+		<visual>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_arm_2.stl"/>
+			</geometry>
+			<material name="white"/>
+		</visual>
+	</link>
+
+	<joint name="second_arm_upper_joint" type="continuous">
+		<parent link="second_arm"/>
+		<child link="second_arm_upper"/>
+		<origin xyz="0.0433013 0 0.04350" rpy="0 -1.0472 0"/>
+		<axis xyz="0 0 1"/>
+	</joint>
+
+	<link name="second_arm_upper">
+		<visual>
+			<origin rpy="0 0 3.141592"/>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_upper_arm.stl"/>
+			</geometry>
+			<material name="white"/>
+		</visual>
+	</link>
+
+
+	<!-- THIRD_ARM -->
+
+	<joint name="third_arm_joint" type="continuous">
+		<parent link="base_link"/>
+		<child link="third_arm"/>
+		<origin xyz="0 0 0.019" rpy="0 0 -2.0944"/>
+		<axis xyz="0 0 1"/>
+	</joint>
+
+	<link name="third_arm">
+		<visual>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_arm_3.stl"/>
+			</geometry>
+			<material name="white"/>
+		</visual>
+	</link>
+
+
+	<joint name="third_arm_upper_joint" type="continuous">
+		<parent link="third_arm"/>
+		<child link="third_arm_upper"/>
+		<origin xyz="0.0433013 0 0.03550" rpy="0 -1.0472 0"/>
+		<axis xyz="0 0 1"/>
+	</joint>
+
+	<link name="third_arm_upper">
+		<visual>
+			<origin rpy="0 0 3.141592"/>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_upper_arm.stl"/>
+			</geometry>
+			<material name="white"/>
+		</visual>
+	</link>
+
+</robot>
