@@ -1,5 +1,6 @@
 import os
 
+from launch.conditions import IfCondition
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
@@ -14,6 +15,7 @@ def generate_launch_description():
 
     # Check if we're told to use sim time
     use_sim_time = LaunchConfiguration('use_sim_time')
+    enable_orientation_publisher = LaunchConfiguration('enable_orientation_publisher')
 
     # Process the URDF file
     pkg_path = os.path.join(get_package_share_directory('spm_robot'))
@@ -39,7 +41,8 @@ def generate_launch_description():
     node_spm_orientation_publisher = Node(
         package='spm_robot',
         executable='spm_orientation_publisher',
-        output='screen'
+        output='screen',
+        condition=IfCondition(enable_orientation_publisher)
     )
 
     node_rviz2 = Node(
@@ -57,6 +60,10 @@ def generate_launch_description():
             'use_sim_time',
             default_value='false',
             description='Use sim time if true'),
+        DeclareLaunchArgument(
+            'enable_orientation_publisher',
+            default_value='false',
+            description='Enable the orientation publisher'),
 
         node_robot_state_publisher,
         node_spm_joint_state_publisher,

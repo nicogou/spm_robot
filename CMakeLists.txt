@@ -28,9 +28,13 @@ ament_target_dependencies(spm_joint_state_publisher rclcpp geometry_msgs sensor_
 add_executable(spm_orientation_publisher src/spm_orientation_publisher.cpp)
 ament_target_dependencies(spm_orientation_publisher rclcpp geometry_msgs)
 
+add_executable(spm_teleop src/spm_teleop.cpp)
+ament_target_dependencies(spm_teleop rclcpp geometry_msgs)
+
 install(TARGETS
   spm_joint_state_publisher
   spm_orientation_publisher
+  spm_teleop
   DESTINATION lib/${PROJECT_NAME}
 )
 
