@@ -21,6 +21,17 @@
 			</geometry>
 			<material name="white"/>
 		</visual>
+		<collision>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_Base.stl"/>
+			</geometry>
+		</collision>
+		<inertial>
+			<mass value="0.0055"/>
+			<inertia ixx="8.83e-7" ixy="0.0" ixz="0.0"
+			         iyy="8.83e-7" iyz="0.0"
+			         izz="1.317e-6"/>
+		</inertial>
 	</link>
 
 	<!-- FIRST_ARM -->
@@ -39,6 +50,17 @@
 			</geometry>
 			<material name="white"/>
 		</visual>
+		<collision>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_arm_1.stl"/>
+			</geometry>
+		</collision>
+		<inertial>
+			<mass value="0.004245"/>
+			<inertia ixx="1.182e-6" ixy="0.0" ixz="-9.68e-7"
+			         iyy="2.266e-6" iyz="0.0"
+			         izz="1.265e-6"/>
+		</inertial>
 	</link>
 
 	<joint name="first_arm_upper_joint" type="continuous">
@@ -56,6 +78,18 @@
 			</geometry>
 			<material name="white"/>
 		</visual>
+		<collision>
+			<origin rpy="0 0 3.141592"/>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_upper_arm.stl"/>
+			</geometry>
+		</collision>
+		<inertial>
+			<mass value="0.00341"/>
+			<inertia ixx="8.64e-7" ixy="0.0" ixz="-3.61e-7"
+			         iyy="1.098e-6" iyz="0.0"
+			         izz="2.62e-7"/>
+		</inertial>
 	</link>
 
 
@@ -75,6 +109,17 @@
 			</geometry>
 			<material name="white"/>
 		</visual>
+		<collision>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_arm_2.stl"/>
+			</geometry>
+		</collision>
+		<inertial>
+			<mass value="0.003916"/>
+			<inertia ixx="7.75e-7" ixy="0.0" ixz="-7.51e-7"
+			         iyy="1.835e-6" iyz="0.0"
+			         izz="1.239e-6"/>
+		</inertial>
 	</link>
 
 	<joint name="second_arm_upper_joint" type="continuous">
@@ -92,6 +137,18 @@
 			</geometry>
 			<material name="white"/>
 		</visual>
+		<collision>
+			<origin rpy="0 0 3.141592"/>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_upper_arm.stl"/>
+			</geometry>
+		</collision>
+		<inertial>
+			<mass value="0.00341"/>
+			<inertia ixx="8.64e-7" ixy="0.0" ixz="-3.61e-7"
+			         iyy="1.098e-6" iyz="0.0"
+			         izz="2.62e-7"/>
+		</inertial>
 	</link>
 
 
@@ -111,6 +168,17 @@
 			</geometry>
 			<material name="white"/>
 		</visual>
+		<collision>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_arm_3.stl"/>
+			</geometry>
+		</collision>
+		<inertial>
+			<mass value="0.003628"/>
+			<inertia ixx="4.78e-7" ixy="0.0" ixz="-5.44e-7"
+			         iyy="1.514e-6" iyz="0.0"
+			         izz="1.212e-6"/>
+		</inertial>
 	</link>
 
 
@@ -129,6 +197,48 @@
 			</geometry>
 			<material name="white"/>
 		</visual>
+		<collision>
+			<origin rpy="0 0 3.141592"/>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_upper_arm.stl"/>
+			</geometry>
+		</collision>
+		<inertial>
+			<mass value="0.00341"/>
+			<inertia ixx="8.64e-7" ixy="0.0" ixz="-3.61e-7"
+			         iyy="1.098e-6" iyz="0.0"
+			         izz="2.62e-7"/>
+		</inertial>
 	</link>
+
+
+	<!-- PLATFORM -->
+
+	<!-- <joint name="platform_joint" type="continuous">
+		<parent link="first_arm_upper"/>
+		<child link="platform"/>
+		<origin xyz="-0.022805 0 0.050" rpy="0 1.5707 0"/>
+	</joint>
+
+	<link name="platform">
+		<visual>
+			<origin rpy="0 0 -0.523"/>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_platform.stl"/>
+			</geometry>
+			<material name="white"/>
+		</visual>
+		<collision>
+			<geometry>
+				<mesh filename="package://spm_robot/description/meshes/SPM_platform.stl"/>
+			</geometry>
+		</collision>
+		<inertial>
+			<mass value="0.003053"/>
+			<inertia ixx="4.84e-7" ixy="0.0" ixz="0.0"
+			         iyy="9.44e-6" iyz="0.0"
+			         izz="4.84e-6"/>
+		</inertial>
+	</link> -->
 
 </robot>
