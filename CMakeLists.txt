@@ -20,10 +20,11 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 
 add_executable(spm_joint_state_publisher src/spm_joint_state_publisher.cpp)
-ament_target_dependencies(spm_joint_state_publisher rclcpp geometry_msgs sensor_msgs visualization_msgs)
+ament_target_dependencies(spm_joint_state_publisher rclcpp geometry_msgs sensor_msgs std_msgs visualization_msgs)
 
 add_executable(spm_orientation_publisher src/spm_orientation_publisher.cpp)
 ament_target_dependencies(spm_orientation_publisher rclcpp geometry_msgs)

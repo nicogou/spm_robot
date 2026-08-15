@@ -10,6 +10,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 #include "geometry_msgs/msg/quaternion.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
@@ -35,7 +36,14 @@ public:
     current_quat_.y = 0.0;
     current_quat_.z = 0.0;
 
+    // Only the passive upper-arm joints are published as joint states here —
+    // the three actuated joints are owned by ros2_control's
+    // joint_state_broadcaster once forward_position_controller is driving them.
     publisher_ = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
+    // theta commands go to the position controller, in the same joint order
+    // configured in spm_controllers.yaml (first/second/third_arm_joint).
+    command_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
+      "/forward_position_controller/commands", 10);
     orientation_marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
       "/spm/orientation_markers", 10);
 
@@ -84,8 +92,8 @@ public:
 
     RCLCPP_INFO(
       this->get_logger(),
-      "Publishing quaternion-based IK joint states on /joint_states "
-      "(ik_mode=%s, alpha_P=%.2f deg, listening on /spm/desired_orientation)",
+      "Publishing quaternion-based IK: theta -> /forward_position_controller/commands, "
+      "phi -> /joint_states (ik_mode=%s, alpha_P=%.2f deg, listening on /spm/desired_orientation)",
       ik_mode_.c_str(), alpha_p_ / kDegToRad);
   }
 
@@ -328,13 +336,19 @@ private:
 
     publish_orientation_markers(q.w, q.x, q.y, q.z);
 
+    // Actuated joints: send as a position command to forward_position_controller.
+    // Order must match the `joints` list in spm_controllers.yaml.
+    std_msgs::msg::Float64MultiArray command_msg;
+    command_msg.data = {theta[0], theta[1], theta[2]};
+    command_pub_->publish(command_msg);
+
+    // Passive joints: publish directly, since ros2_control doesn't know about them.
+    // robot_state_publisher merges this with joint_state_broadcaster's output on the
+    // same /joint_states topic (it keeps a running map of joint name -> position).
     sensor_msgs::msg::JointState msg;
     msg.header.stamp = this->now();
-    msg.name = {
-      "first_arm_joint",       "second_arm_joint",       "third_arm_joint",
-      "first_arm_upper_joint", "second_arm_upper_joint", "third_arm_upper_joint"
-    };
-    msg.position = {theta[0], theta[1], theta[2], phi[0], phi[1], phi[2]};
+    msg.name = {"first_arm_upper_joint", "second_arm_upper_joint", "third_arm_upper_joint"};
+    msg.position = {phi[0], phi[1], phi[2]};
 
     publisher_->publish(msg);
   }
@@ -399,6 +413,7 @@ private:
 
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr publisher_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr command_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr orientation_marker_pub_;
   rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr quaternion_sub_;
 
