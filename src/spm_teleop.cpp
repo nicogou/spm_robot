@@ -58,9 +58,12 @@ const char * kHelp =
   "  1 (↙ bwd-left)   2 (↓ backward)  3 (↘ bwd-right)\n"
   "  s  toggle SAR spin (around body Z / tilted axis)\n"
   "  z  toggle rotation around global Z\n"
+  "  c  toggle CONE mode (constant tilt angle, azimuth sweeps around Z —\n"
+  "     use the numpad to set the cone half-angle before/while active)\n"
   "  q  quit\n"
   "  Parameters: step_deg, max_tilt_deg, publish_rate_hz,\n"
-  "              sar_angular_velocity_deg_s, z_angular_velocity_deg_s\n\n";
+  "              sar_angular_velocity_deg_s, z_angular_velocity_deg_s,\n"
+  "              cone_angular_velocity_deg_s\n\n";
 }  // namespace
 
 class SPMTeleop : public rclcpp::Node
@@ -74,6 +77,7 @@ public:
     this->declare_parameter<double>("publish_rate_hz", 50.0);
     this->declare_parameter<double>("sar_angular_velocity_deg_s", 30.0);
     this->declare_parameter<double>("z_angular_velocity_deg_s", 30.0);
+    this->declare_parameter<double>("cone_angular_velocity_deg_s", 30.0);
 
     step_rad_     = this->get_parameter("step_deg").as_double()     * kDeg2Rad;
     max_tilt_rad_ = this->get_parameter("max_tilt_deg").as_double() * kDeg2Rad;
@@ -82,6 +86,8 @@ public:
       this->get_parameter("sar_angular_velocity_deg_s").as_double() * kDeg2Rad;
     z_angular_velocity_rad_s_ =
       this->get_parameter("z_angular_velocity_deg_s").as_double() * kDeg2Rad;
+    cone_angular_velocity_rad_s_ =
+      this->get_parameter("cone_angular_velocity_deg_s").as_double() * kDeg2Rad;
 
     publisher_ = this->create_publisher<geometry_msgs::msg::Quaternion>(
       "/spm/desired_orientation", 10);
@@ -202,6 +208,17 @@ private:
           RCLCPP_INFO(this->get_logger(), "Z-rotation mode %s", now_active ? "ON" : "OFF");
           break;
         }
+        case 'c': case 'C': {
+          const bool now_active = !cone_active_.load();
+          cone_active_.store(now_active);
+          if (now_active) {
+            // Start the sweep from the platform's current azimuth so the
+            // platform doesn't jump when the mode is switched on.
+            reset_cone_phase_.store(true);
+          }
+          RCLCPP_INFO(this->get_logger(), "Cone mode %s", now_active ? "ON" : "OFF");
+          break;
+        }
         case 'q': case 'Q':
           RCLCPP_INFO(this->get_logger(), "Quit.");
           running_ = false;
@@ -225,6 +242,26 @@ private:
       std::lock_guard<std::mutex> lock(tilt_mutex_);
       tx = tilt_x_;
       ty = tilt_y_;
+    }
+
+    // CONE mode: hold the tilt magnitude (angle from vertical) fixed —
+    // it's still set with the numpad, same as idle mode — and sweep the
+    // azimuth continuously, so pitch (tx) and roll (ty) both vary
+    // sinusoidally while |tilt| stays constant: the platform precesses
+    // around the global Z-axis at a fixed cone angle.
+    if (cone_active_.load()) {
+      const double magnitude = std::sqrt(tx * tx + ty * ty);
+
+      if (reset_cone_phase_.exchange(false)) {
+        cone_phase_rad_ = (magnitude > 1e-9) ? std::atan2(ty, tx) : 0.0;
+      }
+
+      cone_phase_rad_ += cone_angular_velocity_rad_s_ * dt;
+      if (cone_phase_rad_ >  kPi) { cone_phase_rad_ -= 2.0 * kPi; }
+      if (cone_phase_rad_ < -kPi) { cone_phase_rad_ += 2.0 * kPi; }
+
+      tx = magnitude * std::cos(cone_phase_rad_);
+      ty = magnitude * std::sin(cone_phase_rad_);
     }
 
     const auto q_tilt_msg = tilt_to_quat(tx, ty);
@@ -286,6 +323,10 @@ private:
   double z_angle_rad_{0.0};
   double z_angular_velocity_rad_s_{};
   std::atomic<bool> reset_spin_angles_{false};
+  std::atomic<bool> cone_active_{false};
+  double cone_phase_rad_{0.0};
+  double cone_angular_velocity_rad_s_{};
+  std::atomic<bool> reset_cone_phase_{false};
   rclcpp::Time last_publish_time_;
 };
 
