@@ -14,13 +14,13 @@
 #include "geometry_msgs/msg/quaternion.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
+#include "spm_robot/spm_ik.hpp"
 
 using namespace std::chrono_literals;
 
 namespace
 {
 constexpr double kPi = 3.14159265358979323846;
-constexpr double kTwoPi = 2.0 * kPi;
 constexpr double kDegToRad = kPi / 180.0;
 }  // namespace
 
@@ -73,82 +73,37 @@ public:
     // alpha_P: fixed DH twist angle of the proximal link (structural constant of the
     // manipulator in the paper's model: 60°).
     this->declare_parameter<double>("alpha_p_deg", 60.0);
-    alpha_p_ = this->get_parameter("alpha_p_deg").as_double() * kDegToRad;
+    const double alpha_p = this->get_parameter("alpha_p_deg").as_double() * kDegToRad;
 
     // eta_i: fixed mounting angle of each leg about the base Z-axis. Defaults to the
     // 0/120/240 deg layout implied by the original v_home vectors in this node.
     this->declare_parameter<std::vector<double>>("eta_deg", std::vector<double>{0.0, 120.0, 240.0});
     const auto eta_deg = this->get_parameter("eta_deg").as_double_array();
+    std::array<double, 3> eta{};
     if (eta_deg.size() != 3) {
       RCLCPP_WARN(
         this->get_logger(),
         "eta_deg parameter must have exactly 3 entries; using default 0/120/240.");
-      eta_ = {0.0, 120.0 * kDegToRad, 240.0 * kDegToRad};
+      eta = {0.0, 120.0 * kDegToRad, 240.0 * kDegToRad};
     } else {
       for (size_t i = 0; i < 3; ++i) {
-        eta_[i] = eta_deg[i] * kDegToRad;
+        eta[i] = eta_deg[i] * kDegToRad;
       }
     }
+
+    ik_solver_ = std::make_unique<spm_ik::SpmIK>(alpha_p, eta);
 
     RCLCPP_INFO(
       this->get_logger(),
       "Publishing quaternion-based IK: theta -> /forward_position_controller/commands, "
       "phi -> /joint_states (ik_mode=%s, alpha_P=%.2f deg, listening on /spm/desired_orientation)",
-      ik_mode_.c_str(), alpha_p_ / kDegToRad);
+      ik_mode_.c_str(), alpha_p / kDegToRad);
   }
 
 private:
   void quaternion_callback(const geometry_msgs::msg::Quaternion::SharedPtr msg)
   {
     current_quat_ = *msg;
-  }
-
-  static double wrap_to_pi(double angle)
-  {
-    while (angle > kPi) {
-      angle -= kTwoPi;
-    }
-    while (angle < -kPi) {
-      angle += kTwoPi;
-    }
-    return angle;
-  }
-
-  static double unwrap_near(double angle, double reference)
-  {
-    return reference + wrap_to_pi(angle - reference);
-  }
-
-  static std::array<double, 3> select_continuous_solution(
-    const std::array<double, 3> & root_a,
-    const std::array<double, 3> & root_b,
-    const std::array<double, 3> & prev)
-  {
-    std::array<double, 3> result{};
-    for (size_t i = 0; i < 3; ++i) {
-      const double a = unwrap_near(root_a[i], prev[i]);
-      const double b = unwrap_near(root_b[i], prev[i]);
-      result[i] = (std::abs(a - prev[i]) <= std::abs(b - prev[i])) ? a : b;
-    }
-    return result;
-  }
-
-  std::array<double, 3> select_mode_solution(
-    const std::array<double, 3> & root_plus,
-    const std::array<double, 3> & root_minus,
-    const std::array<double, 3> & prev,
-    const std::string & mode) const
-  {
-    if (mode == "continuity") {
-      return select_continuous_solution(root_plus, root_minus, prev);
-    }
-
-    std::array<double, 3> result{};
-    for (size_t i = 0; i < 3; ++i) {
-      const double raw = (mode[i] == 'l') ? root_plus[i] : root_minus[i];
-      result[i] = unwrap_near(raw, prev[i]);
-    }
-    return result;
   }
 
   // Quaternion-derived rotation matrix (tool/platform frame -> reference frame),
@@ -174,144 +129,12 @@ private:
     };
   }
 
-  // Solves A*u^2 + B*u + C = 0 for both branches. Falls back to the linear case when
-  // A ~ 0, and reports failure (false) when the orientation is unreachable for this leg
-  // (negative discriminant, or a genuinely degenerate 0*u + 0 = 0 line).
-  static bool solve_quadratic_u(double A, double B, double C, double eps, double & u_plus, double & u_minus)
-  {
-    if (std::abs(A) < eps) {
-      if (std::abs(B) < eps) {
-        return false;
-      }
-      const double u = -C / B;
-      u_plus = u;
-      u_minus = u;
-      return true;
-    }
-    const double disc = B * B - 4.0 * A * C;
-    if (disc < 0.0) {
-      return false;
-    }
-    const double sq = std::sqrt(disc);
-    u_plus = (-B + sq) / (2.0 * A);
-    u_minus = (-B - sq) / (2.0 * A);
-    return true;
-  }
-
-  // Inverse kinematics for the three motor angles theta_i, following the paper's
-  // derivation: Weierstrass substitution u_i = tan(theta_i/2), with
-  //   A_i * u_i^2 + B_i * u_i + C_i = 0
-  // and A_i, B_i, C_i functions of the tool-orientation quaternion (e0,e1,e2,e3), the
-  // leg mounting angle eta_i, and the proximal-link twist angle alpha_P.
-  bool solve_inverse_kinematics(
-    double e0, double e1, double e2, double e3,
-    const std::array<double, 3> & prev_theta,
-    std::array<double, 3> & theta_out) const
-  {
-    constexpr double eps = 1e-10;
-    const double sinA = std::sin(alpha_p_);
-    const double cosA = std::cos(alpha_p_);
-
-    std::array<double, 3> root_plus{};
-    std::array<double, 3> root_minus{};
-
-    for (size_t i = 0; i < 3; ++i) {
-      const double eta = eta_[i];
-      const double c_eta = std::cos(eta);
-      const double s_eta = std::sin(eta);
-      const double c_2eta = std::cos(2.0 * eta);
-      const double s_2eta = std::sin(2.0 * eta);
-      const double cross_term = cosA * ((e0 * e1 + e2 * e3) * c_eta + (e0 * e2 - e1 * e3) * s_eta);
-
-      const double A = 2.0 * (
-        -e0 * e3 * sinA + e1 * e2 * c_2eta * sinA + cross_term
-        - 0.5 * e1 * e1 * sinA * s_2eta + 0.5 * e2 * e2 * sinA * s_2eta);
-
-      const double B = 2.0 * (
-        -e0 * e0 * sinA + e3 * e3 * sinA + e1 * e1 * c_2eta * sinA - e2 * e2 * c_2eta * sinA
-        + 2.0 * e1 * e2 * sinA * s_2eta);
-
-      const double C = 2.0 * (
-        e0 * e3 * sinA - e1 * e2 * c_2eta * sinA + cross_term
-        + 0.5 * e1 * e1 * sinA * s_2eta - 0.5 * e2 * e2 * sinA * s_2eta);
-
-      double u_plus = 0.0;
-      double u_minus = 0.0;
-      if (!solve_quadratic_u(A, B, C, eps, u_plus, u_minus)) {
-        return false;
-      }
-
-      // atan2(2u, 1-u^2) is equivalent to atan2(sin(theta), cos(theta)) up to the
-      // common positive factor 1/(1+u^2), so it is safe to skip that division.
-      root_plus[i] = std::atan2(2.0 * u_plus, 1.0 - u_plus * u_plus);
-      root_minus[i] = std::atan2(2.0 * u_minus, 1.0 - u_minus * u_minus);
-    }
-
-    theta_out = select_mode_solution(root_plus, root_minus, prev_theta, ik_mode_);
-    return true;
-  }
-
-  // Inverse kinematics for the passive distal-joint angles phi_i (Section 8.2).
-  // Given the already-solved theta values, solves D_i*t^2 + E_i*t + F_i = 0
-  // (Weierstrass t_i = tan(phi_i/2)) and selects the root in [0, pi] (sec. 8.4.2).
-  bool solve_phi(
-    double e0, double e1, double e2, double e3,
-    const std::array<double, 3> & theta,
-    std::array<double, 3> & phi_out) const
-  {
-    constexpr double eps = 1e-10;
-
-    for (size_t i = 0; i < 3; ++i) {
-      const double eta = eta_[i];
-      const double th  = theta[i];
-
-      const double c_th      = std::cos(th);
-      const double s_th      = std::sin(th);
-      const double c_2eta_th = std::cos(2.0 * eta + th);
-      const double s_2eta_th = std::sin(2.0 * eta + th);
-
-      // D and F coefficients (note F = -D).
-      const double D =
-        -(e0 * e0) * c_th      + (e3 * e3) * c_th
-        + (e1 * e1) * c_2eta_th - (e2 * e2) * c_2eta_th
-        - 2.0 * e0 * e3 * s_th + 2.0 * e1 * e2 * s_2eta_th;
-
-      // E coefficient — depends on alpha_P, eta and theta.
-      const double E =
-        -2.0 * (e0 * e2 - e1 * e3) * std::cos(alpha_p_ - eta)
-        + 2.0 * (e0 * e2 - e1 * e3) * std::cos(alpha_p_ + eta)
-        + 2.0 * e0 * e3 * std::cos(alpha_p_ - th)
-        - 2.0 * e1 * e2 * std::cos(alpha_p_ - 2.0 * eta - th)
-        + 2.0 * e0 * e3 * std::cos(alpha_p_ + th)
-        - 2.0 * e1 * e2 * std::cos(alpha_p_ + 2.0 * eta + th)
-        - 2.0 * (e0 * e1 + e2 * e3) * std::sin(alpha_p_ - eta)
-        - 2.0 * (e0 * e1 + e2 * e3) * std::sin(alpha_p_ + eta)
-        + (e0 * e0 - e3 * e3) * std::sin(alpha_p_ - th)
-        - (e1 * e1 - e2 * e2) * std::sin(alpha_p_ - 2.0 * eta - th)
-        - (e0 * e0 - e3 * e3) * std::sin(alpha_p_ + th)
-        + (e1 * e1 - e2 * e2) * std::sin(alpha_p_ + 2.0 * eta + th);
-
-      double t_plus = 0.0, t_minus = 0.0;
-      if (!solve_quadratic_u(D, E, -D, eps, t_plus, t_minus)) {
-        return false;
-      }
-
-      const double phi1 = std::atan2(2.0 * t_plus,  1.0 - t_plus  * t_plus);
-      const double phi2 = std::atan2(2.0 * t_minus, 1.0 - t_minus * t_minus);
-
-      // Select the root in [0, pi]; initial position is at pi/2 (90 deg).
-      phi_out[i] = (phi1 >= 0.0 && phi1 <= kPi) ? phi1 : phi2;
-    }
-
-    return true;
-  }
-
   void publish_joint_states()
   {
     const auto q = current_quat_;
 
     std::array<double, 3> theta{};
-    if (!solve_inverse_kinematics(q.w, q.x, q.y, q.z, previous_theta_, theta)) {
+    if (!ik_solver_->solve_theta(q.w, q.x, q.y, q.z, previous_theta_, ik_mode_, theta)) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(),
         *this->get_clock(),
@@ -323,7 +146,7 @@ private:
     }
 
     std::array<double, 3> phi{};
-    if (!solve_phi(q.w, q.x, q.y, q.z, theta, phi)) {
+    if (!ik_solver_->solve_phi(q.w, q.x, q.y, q.z, theta, phi)) {
       RCLCPP_WARN_THROTTLE(
         this->get_logger(),
         *this->get_clock(),
@@ -420,9 +243,8 @@ private:
   geometry_msgs::msg::Quaternion current_quat_;
   std::array<double, 3> previous_theta_;
   std::array<double, 3> previous_phi_{kPi / 2.0, kPi / 2.0, kPi / 2.0};
-  std::array<double, 3> eta_{};
-  double alpha_p_{45.0 * kDegToRad};
   std::string ik_mode_;
+  std::unique_ptr<spm_ik::SpmIK> ik_solver_;
 };
 
 int main(int argc, char * argv[])

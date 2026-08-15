@@ -23,16 +23,28 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 
+add_library(spm_ik src/spm_ik.cpp)
+target_include_directories(spm_ik PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 add_executable(spm_joint_state_publisher src/spm_joint_state_publisher.cpp)
 ament_target_dependencies(spm_joint_state_publisher rclcpp geometry_msgs sensor_msgs std_msgs visualization_msgs)
+target_link_libraries(spm_joint_state_publisher spm_ik)
 
 add_executable(spm_teleop src/spm_teleop.cpp)
 ament_target_dependencies(spm_teleop rclcpp geometry_msgs)
 
 install(TARGETS
+  spm_ik
   spm_joint_state_publisher
   spm_teleop
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/
+  DESTINATION include
 )
 
 if(BUILD_TESTING)
@@ -50,5 +62,8 @@ install(
   DIRECTORY config description launch worlds
   DESTINATION share/${PROJECT_NAME}
 )
+
+ament_export_include_directories(include)
+ament_export_libraries(spm_ik)
 
 ament_package()
