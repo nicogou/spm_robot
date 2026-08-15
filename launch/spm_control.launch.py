@@ -57,6 +57,12 @@ def generate_launch_description():
         parameters=[robot_description],
     )
 
+    node_spm_joint_state_publisher = Node(
+        package='spm_robot',
+        executable='spm_joint_state_publisher',
+        output='screen'
+    )
+
     rviz_node = Node(
         package='rviz2',
         executable='rviz2',
@@ -102,6 +108,7 @@ def generate_launch_description():
     nodes = [
         control_node,
         robot_state_pub_node,
+        node_spm_joint_state_publisher,
         joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_forward_position_controller_spawner_after_joint_state_broadcaster_spawner,
