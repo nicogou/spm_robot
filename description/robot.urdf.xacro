@@ -3,4 +3,34 @@
 
     <xacro:include filename="$(find spm_robot)/description/robot_core.xacro" />
 
+
+	<!-- ROS2_CONTROL -->
+	<!-- Only the three base joints are actuated. The *_upper joints are
+	     passive, kinematically coupled through the parallel mechanism (and
+	     through the still-commented-out platform), so they are intentionally
+	     left out of ros2_control: nothing drives them directly, and a
+	     mock/simulated HardwareInterface would just report whatever value
+	     you set, with no coupling to the actuated joints. -->
+
+	<ros2_control name="SPMSystem" type="system">
+		<hardware>
+			<plugin>mock_components/GenericSystem</plugin>
+		</hardware>
+		<joint name="first_arm_joint">
+			<command_interface name="position"/>
+			<state_interface name="position"/>
+			<state_interface name="velocity"/>
+		</joint>
+		<joint name="second_arm_joint">
+			<command_interface name="position"/>
+			<state_interface name="position"/>
+			<state_interface name="velocity"/>
+		</joint>
+		<joint name="third_arm_joint">
+			<command_interface name="position"/>
+			<state_interface name="position"/>
+			<state_interface name="velocity"/>
+		</joint>
+	</ros2_control>
+
 </robot>
